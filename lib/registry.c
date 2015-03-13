@@ -82,7 +82,7 @@ static void show_format(gpointer key, gpointer value, gpointer user_data)
 
 	fprintf(data->fp, "%s%s", data->iter ? ", " : "",
 		g_quark_to_string((GQuark) (unsigned long) key));
-	data->iter++;
+	data->iter;
 }
 
 void bt_fprintf_format_list(FILE *fp)
