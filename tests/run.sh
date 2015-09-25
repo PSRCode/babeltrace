@@ -19,4 +19,4 @@
 
 [ -z "$1" ] && echo "Error: No testlist. Please specify a testlist to run." && exit 1
 
-prove --merge --exec '' - < $1
+prove --merge -v --exec '' - < $1

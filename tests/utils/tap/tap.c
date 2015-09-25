@@ -145,15 +145,9 @@ _gen_result(int ok, const char *func, char *file, unsigned int line,
 			failures--;
 	}
 
+	printf(" location: %s:%s:%d", file, func, line);
 	printf("\n");
 
-	if(!ok) {
-		if(getenv("HARNESS_ACTIVE") != NULL)
-			fputs("\n", stderr);
-
-		diag("    Failed %stest (%s:%s() at line %d)",
-		     todo ? "(TODO) " : "", file, func, line);
-	}
 	free(local_test_name);
 
 	UNLOCK;

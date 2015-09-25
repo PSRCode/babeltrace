@@ -204,33 +204,25 @@ ok(){
             _failed_tests=$(( _failed_tests - 1 ))
         fi
     fi
+    local file='tap.sh'
+    local func=
+    local line=
 
-    echo
-    if (( result != 0 )) ; then
-        local file='tap-functions'
-        local func=
-        local line=
-
-        local i=0
-        local bt=$(caller $i)
-        while _matches "$bt" "tap-functions$" ; do
-            i=$(( $i + 1 ))
-            bt=$(caller $i)
-        done
-        local backtrace=
-        eval $(caller $i | (read line func file ; echo "backtrace=\"$file:$func() at line $line.\""))
-
-        local t=
-        [[ -n "$TODO" ]] && t="(TODO) "
-
-        if [[ -n "$name" ]] ; then
-            diag "  Failed ${t}test '$name'"
-            diag "  in $backtrace"
-        else
-            diag "  Failed ${t}test in $backtrace"
-        fi
+    local i=0
+    local bt=$(caller $i)
+    local file=$(basename $(echo $bt | cut -d" " -f3))
+    while _matches "$file" "tap.sh" ; do
+	    i=$(( $i + 1 ))
+	    bt=$(caller $i)
+	    local file=$(basename $(echo $bt | cut -d" " -f3))
+    done
+    local backtrace=
+    eval $(caller $i | (read line func file ; echo "backtrace=\"$file:$func():$line.\""))
+    if [[ -n "$backtrace" ]] ; then
+	    echo -n " location: $backtrace"
     fi
 
+    echo
     return $result
 }
 
