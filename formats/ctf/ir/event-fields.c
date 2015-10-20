@@ -32,6 +32,7 @@
 #include <babeltrace/object-internal.h>
 #include <babeltrace/ref.h>
 #include <babeltrace/compiler.h>
+#include <babeltrace/compat/fcntl.h>
 
 #define PACKET_LEN_INCREMENT	(getpagesize() * 8 * CHAR_BIT)
 
@@ -2170,9 +2171,13 @@ int increase_packet_size(struct ctf_stream_pos *pos)
 	}
 
 	pos->packet_size += PACKET_LEN_INCREMENT;
-	ret = posix_fallocate(pos->fd, pos->mmap_offset,
-		pos->packet_size / CHAR_BIT);
+	do {
+		ret = bt_posix_fallocate(pos->fd, pos->mmap_offset,
+			pos->packet_size / CHAR_BIT);
+	} while (ret == EINTR);
 	if (ret) {
+		errno = EINTR;
+		ret = -1;
 		goto end;
 	}
 

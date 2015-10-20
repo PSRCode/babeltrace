@@ -53,6 +53,7 @@
 #include "metadata/ctf-ast.h"
 #include "events-private.h"
 #include <babeltrace/compat/memstream.h>
+#include <babeltrace/compat/fcntl.h>
 
 #define LOG2_CHAR_BIT	3
 
@@ -860,7 +861,6 @@ void ctf_packet_seek(struct bt_stream_pos *stream_pos, size_t index, int whence)
 	struct ctf_file_stream *file_stream =
 		container_of(pos, struct ctf_file_stream, pos);
 	int ret;
-	off_t off;
 	struct packet_index *packet_index, *prev_index;
 
 	switch (whence) {
@@ -904,9 +904,11 @@ void ctf_packet_seek(struct bt_stream_pos *stream_pos, size_t index, int whence)
 		}
 		pos->content_size = -1U;	/* Unknown at this point */
 		pos->packet_size = WRITE_PACKET_LEN;
-		off = posix_fallocate(pos->fd, pos->mmap_offset,
-				      pos->packet_size / CHAR_BIT);
-		assert(off >= 0);
+		do {
+			ret = bt_posix_fallocate(pos->fd, pos->mmap_offset,
+					      pos->packet_size / CHAR_BIT);
+		} while (ret == EINTR);
+		assert(ret == 0);
 		pos->offset = 0;
 	} else {
 	read_next_packet:
@@ -1107,7 +1109,7 @@ int ctf_trace_metadata_packet_read(struct ctf_trace *td, FILE *in,
 		memcpy(td->uuid, header.uuid, sizeof(header.uuid));
 		CTF_TRACE_SET_FIELD(td, uuid);
 	} else {
-		if (babeltrace_uuid_compare(header.uuid, td->uuid))
+		if (bt_uuid_compare(header.uuid, td->uuid))
 			return -EINVAL;
 	}
 
@@ -1593,7 +1595,7 @@ begin:
 				elem = bt_array_index(defarray, i);
 				uuidval[i] = bt_get_unsigned_int(elem);
 			}
-			ret = babeltrace_uuid_compare(td->uuid, uuidval);
+			ret = bt_uuid_compare(td->uuid, uuidval);
 			if (ret) {
 				fprintf(stderr, "[error] Unique Universal Identifiers do not match.\n");
 				return -EINVAL;
@@ -2007,7 +2009,7 @@ int ctf_open_file_stream_read(struct ctf_trace *td, const char *path, int flags,
 	snprintf(index_name, strlen(path) + sizeof(INDEX_PATH),
 			INDEX_PATH, path);
 
-	if (faccessat(td->dirfd, index_name, O_RDONLY, flags) < 0) {
+	if (bt_faccessat(td->dirfd, td->parent.path, index_name, O_RDONLY, 0) < 0) {
 		ret = create_stream_packet_index(td, file_stream);
 		if (ret) {
 			fprintf(stderr, "[error] Stream index creation error.\n");

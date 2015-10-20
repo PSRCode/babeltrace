@@ -1,4 +1,4 @@
-AM_CFLAGS = $(PACKAGE_CFLAGS) -I$(top_srcdir)/include
+AM_CFLAGS = $(PACKAGE_CFLAGS) -I$(top_srcdir)/include -I$(builddir)
 
 SUBDIRS = types metadata writer ir .
 
@@ -13,7 +13,7 @@ libbabeltrace_ctf_la_SOURCES = \
 
 # Request that the linker keeps all static libraries objects.
 libbabeltrace_ctf_la_LDFLAGS = \
-	-Wl,--no-as-needed -version-info $(BABELTRACE_LIBRARY_VERSION)
+	$(LD_NO_AS_NEEDED) -version-info $(BABELTRACE_LIBRARY_VERSION)
 
 libbabeltrace_ctf_la_LIBADD = \
 	$(top_builddir)/lib/libbabeltrace.la \

@@ -24,17 +24,13 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
- *
- * Depends on glibc 2.10 for getline().
  */
 
-#define _GNU_SOURCE
-#include <config.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/mman.h>
-#include <dirent.h>
+#include <babeltrace/compat/dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -47,6 +43,7 @@
 #include <babeltrace/ctf/types.h>
 #include <babeltrace/compat/uuid.h>
 #include <babeltrace/compat/utc.h>
+#include <babeltrace/compat/stdio.h>
 #include <babeltrace/endian.h>
 
 #define NSEC_PER_USEC 1000UL
@@ -108,7 +105,7 @@ void print_metadata(FILE *fp)
 	ret = sscanf(VERSION, "%u.%u", &major, &minor);
 	if (ret != 2)
 		fprintf(stderr, "[warning] Incorrect babeltrace version format\n.");
-	babeltrace_uuid_unparse(s_uuid, uuid_str);
+	bt_uuid_unparse(s_uuid, uuid_str);
 	fprintf(fp, metadata_fmt,
 		major,
 		minor,
@@ -276,13 +273,15 @@ void trace_string(char *line, struct ctf_stream_pos *pos, size_t len)
 	printf_debug("read: %s\n", line);
 
 	for (;;) {
+		int packet_filled = 0;
+
 		ctf_dummy_pos(pos, &dummy);
 		write_event_header(&dummy, line, &tline, len, &tlen, &ts);
 		if (!ctf_align_pos(&dummy, sizeof(uint8_t) * CHAR_BIT))
-			goto error;
+			packet_filled = 1;
 		if (!ctf_move_pos(&dummy, tlen * CHAR_BIT))
-			goto error;
-		if (ctf_pos_packet(&dummy)) {
+			packet_filled = 1;
+		if (packet_filled || ctf_pos_packet(&dummy)) {
 			ctf_pos_pad_packet(pos);
 			write_packet_header(pos, s_uuid);
 			write_packet_context(pos);
@@ -316,7 +315,7 @@ void trace_text(FILE *input, int output)
 	struct ctf_stream_pos pos;
 	ssize_t len;
 	char *line = NULL, *nl;
-	size_t linesize;
+	size_t linesize = 0;
 	int ret;
 
 	memset(&pos, 0, sizeof(pos));
@@ -325,10 +324,11 @@ void trace_text(FILE *input, int output)
 		fprintf(stderr, "Error in ctf_init_pos\n");
 		return;
 	}
+	ctf_packet_seek(&pos.parent, 0, SEEK_CUR);
 	write_packet_header(&pos, s_uuid);
 	write_packet_context(&pos);
 	for (;;) {
-		len = getline(&line, &linesize, input);
+		len = bt_getline(&line, &linesize, input);
 		if (len < 0)
 			break;
 		nl = strrchr(line, '\n');
@@ -412,7 +412,7 @@ int main(int argc, char **argv)
 		perror("opendir");
 		goto error_rmdir;
 	}
-	dir_fd = dirfd(dir);
+	dir_fd = bt_dirfd(dir);
 	if (dir_fd < 0) {
 		perror("dirfd");
 		goto error_closedir;
@@ -437,7 +437,7 @@ int main(int argc, char **argv)
 		goto error_closemetadatafd;
 	}
 
-	babeltrace_uuid_generate(s_uuid);
+	bt_uuid_generate(s_uuid);
 	print_metadata(metadata_fp);
 	trace_text(stdin, fd);
 
