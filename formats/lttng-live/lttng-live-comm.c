@@ -56,6 +56,7 @@
 
 #include "lttng-live.h"
 #include "lttng-viewer-abi.h"
+#include "lttng-live-trace.h"
 
 #define ACTIVE_POLL_DELAY	100	/* ms */
 
@@ -985,7 +986,8 @@ void lttng_index_to_packet_index(struct lttng_viewer_index *lindex,
 static
 int get_next_index(struct lttng_live_ctx *ctx,
 		struct lttng_live_viewer_stream *viewer_stream,
-		struct packet_index *index, uint64_t *stream_id)
+		struct packet_index *index, uint64_t *stream_id,
+		struct ctf_file_stream *file_stream)
 {
 	struct lttng_viewer_cmd cmd;
 	struct lttng_viewer_get_next_index rq;
@@ -1049,6 +1051,14 @@ retry:
 		*stream_id = be64toh(rp->stream_id);
 		break;
 	case LTTNG_VIEWER_INDEX_OK:
+		if(file_stream->parent.stream_class != NULL) {
+			tracepoint(babeltrace, lttng_live_received_index,
+				viewer_stream->id,
+				ctf_get_real_timestamp(&file_stream->parent,
+					be64toh(rp->timestamp_begin)),
+				ctf_get_real_timestamp(&file_stream->parent,
+					be64toh(rp->timestamp_end)));
+		}
 		printf_verbose("get_next_index: Ok, need metadata update : %u\n",
 				rp->flags & LTTNG_VIEWER_FLAG_NEW_METADATA);
 		lttng_index_to_packet_index(rp, index);
@@ -1232,7 +1242,7 @@ retry:
 		lttng_index_to_packet_index(&viewer_stream->current_index, cur_index);
 	} else {
 		printf_verbose("get_next_index for stream %" PRIu64 "\n", viewer_stream->id);
-		ret = get_next_index(session->ctx, viewer_stream, cur_index, &stream_id);
+		ret = get_next_index(session->ctx, viewer_stream, cur_index, &stream_id, file_stream);
 		if (ret < 0) {
 			pos->offset = EOF;
 			if (!lttng_live_should_quit()) {

@@ -7,7 +7,7 @@ noinst_HEADERS = \
 		 lttng-live.h
 
 libbabeltrace_lttng_live_la_SOURCES = \
-	lttng-live-plugin.c lttng-live-comm.c
+	lttng-live-plugin.c lttng-live-comm.c lttng-live-trace.c
 
 # Request that the linker keeps all static libraries objects.
 libbabeltrace_lttng_live_la_LDFLAGS = \
@@ -16,4 +16,5 @@ libbabeltrace_lttng_live_la_LDFLAGS = \
 
 libbabeltrace_lttng_live_la_LIBADD = \
 	$(top_builddir)/lib/libbabeltrace.la \
-	$(top_builddir)/formats/ctf/libbabeltrace-ctf.la
+	$(top_builddir)/formats/ctf/libbabeltrace-ctf.la \
+	-llttng-ust -ldl

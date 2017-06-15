@@ -1,0 +1,12 @@
+TRACEPOINT_EVENT(babeltrace, lttng_live_received_index,
+    TP_ARGS(
+        unsigned long, stream_id_arg,
+        unsigned long, timestamp_begin_arg,
+        unsigned long, timestamp_end_arg
+    ),
+    TP_FIELDS(
+        ctf_integer(unsigned long, stream_id, stream_id_arg)
+        ctf_integer(unsigned long, timestamp_begin, timestamp_begin_arg)
+        ctf_integer(unsigned long, timestamp_end, timestamp_end_arg)
+    )
+)
