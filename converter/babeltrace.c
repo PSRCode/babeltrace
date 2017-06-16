@@ -63,6 +63,8 @@
 
 static char *opt_input_format, *opt_output_format;
 
+int opt_skip_events_processing = 0;
+
 /*
  * We are not freeing opt_input_paths ipath elements when exiting from
  * main() for backward compatibility with libpop 0.13, which does not
@@ -111,6 +113,7 @@ enum {
 	OPT_CLOCK_GMT,
 	OPT_CLOCK_FORCE_CORRELATE,
 	OPT_STREAM_INTERSECTION,
+	OPT_SKIP_EVENTS_PROCESSING,
 	OPT_DEBUG_INFO_DIR,
 	OPT_DEBUG_INFO_FULL_PATH,
 	OPT_DEBUG_INFO_TARGET_PREFIX,
@@ -144,6 +147,7 @@ static struct poptOption long_options[] = {
 	{ "clock-gmt", 0, POPT_ARG_NONE, NULL, OPT_CLOCK_GMT, NULL, NULL },
 	{ "clock-force-correlate", 0, POPT_ARG_NONE, NULL, OPT_CLOCK_FORCE_CORRELATE, NULL, NULL },
 	{ "stream-intersection", 0, POPT_ARG_NONE, NULL, OPT_STREAM_INTERSECTION, NULL, NULL },
+	{ "skip-events-processing", 0, POPT_ARG_NONE, NULL, OPT_SKIP_EVENTS_PROCESSING, NULL, NULL },
 #ifdef ENABLE_DEBUG_INFO
 	{ "debug-info-dir", 0, POPT_ARG_STRING, NULL, OPT_DEBUG_INFO_DIR, NULL, NULL },
 	{ "debug-info-full-path", 0, POPT_ARG_NONE, NULL, OPT_DEBUG_INFO_FULL_PATH, NULL, NULL },
@@ -422,6 +426,9 @@ static int parse_options(int argc, char **argv)
 			break;
 		case OPT_STREAM_INTERSECTION:
 			opt_stream_intersection = 1;
+			break;
+		case OPT_SKIP_EVENTS_PROCESSING:
+			opt_skip_events_processing = 1;
 			break;
 		case OPT_DEBUG_INFO_DIR:
 			opt_debug_info_dir = (char *) poptGetOptArg(pc);

@@ -1773,12 +1773,14 @@ int lttng_live_read(struct lttng_live_ctx *ctx)
 					/* End of trace */
 					break;
 				}
-				ret = sout->parent.event_cb(&sout->parent,
-						event->parent->stream);
-				if (ret) {
-					fprintf(stderr, "[error] Writing "
-							"event failed.\n");
-					goto end_free;
+				if(!opt_skip_events_processing) {
+					ret = sout->parent.event_cb(&sout->parent,
+							event->parent->stream);
+					if (ret) {
+						fprintf(stderr, "[error] Writing "
+								"event failed.\n");
+						goto end_free;
+					}
 				}
 			}
 			ret = bt_iter_next(bt_ctf_get_iter(iter));
