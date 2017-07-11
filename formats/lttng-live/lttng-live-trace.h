@@ -120,6 +120,17 @@ TRACEPOINT_EVENT(babeltrace, lttng_live_get_index_leave,
         ctf_integer(int, ret, ret_arg)
     )
 )
+TRACEPOINT_EVENT(babeltrace, lttng_live_get_index_reply,
+    TP_ARGS(
+        unsigned long, stream_id_arg,
+        int, status_arg
+    ),
+    TP_FIELDS(
+        ctf_integer(unsigned long, stream_id, stream_id_arg)
+        ctf_integer(int, status, status_arg)
+    )
+)
+
 TRACEPOINT_EVENT(babeltrace, lttng_live_get_data_packet_enter,
     TP_ARGS(), TP_FIELDS())
 TRACEPOINT_EVENT(babeltrace, lttng_live_get_data_packet_leave,

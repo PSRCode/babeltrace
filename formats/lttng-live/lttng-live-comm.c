@@ -1057,6 +1057,9 @@ retry:
 
 	rp->flags = be32toh(rp->flags);
 
+	tracepoint(babeltrace, lttng_live_get_index_reply,
+		viewer_stream->id, be32toh(rp->status));
+
 	switch (be32toh(rp->status)) {
 	case LTTNG_VIEWER_INDEX_INACTIVE:
 		printf_verbose("get_next_index: inactive\n");
