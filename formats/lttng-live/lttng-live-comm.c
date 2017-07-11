@@ -81,11 +81,14 @@ static int get_new_metadata(struct lttng_live_ctx *ctx,
 static
 ssize_t lttng_live_recv(int fd, void *buf, size_t len)
 {
+	tracepoint(babeltrace, lttng_live_recv_enter, fd, len);
 	ssize_t ret;
 	size_t copied = 0, to_copy = len;
 
 	do {
+		tracepoint(babeltrace, sys_recv_enter, fd, to_copy);
 		ret = recv(fd, buf + copied, to_copy, 0);
+		tracepoint(babeltrace, sys_recv_leave, fd, ret);
 		if (ret > 0) {
 			assert(ret <= to_copy);
 			copied += ret;
@@ -96,17 +99,22 @@ ssize_t lttng_live_recv(int fd, void *buf, size_t len)
 	if (ret > 0)
 		ret = copied;
 	/* ret = 0 means orderly shutdown, ret < 0 is error. */
+	tracepoint(babeltrace, lttng_live_recv_leave, fd, ret);
 	return ret;
 }
 
 static
 ssize_t lttng_live_send(int fd, const void *buf, size_t len)
 {
+	tracepoint(babeltrace, lttng_live_send_enter, fd, len);
 	ssize_t ret;
 
 	do {
+		tracepoint(babeltrace, sys_send_enter, fd, len);
 		ret = bt_send_nosigpipe(fd, buf, len);
+		tracepoint(babeltrace, sys_send_leave, fd, ret);
 	} while (ret < 0 && errno == EINTR);
+	tracepoint(babeltrace, lttng_live_send_leave, fd, ret);
 	return ret;
 }
 
@@ -642,7 +650,7 @@ error:
 }
 
 static
-int get_data_packet(struct lttng_live_ctx *ctx,
+int actual_get_data_packet(struct lttng_live_ctx *ctx,
 		struct ctf_stream_pos *pos,
 		struct lttng_live_viewer_stream *stream, uint64_t offset,
 		uint64_t len)
@@ -795,6 +803,18 @@ end:
 
 error:
 	return -1;
+}
+
+static
+int get_data_packet(struct lttng_live_ctx *ctx,
+		struct ctf_stream_pos *pos,
+		struct lttng_live_viewer_stream *stream, uint64_t offset,
+		uint64_t len)
+{
+	tracepoint(babeltrace, lttng_live_get_data_packet_enter);
+	int ret = actual_get_data_packet(ctx, pos, stream, offset, len);
+	tracepoint(babeltrace, lttng_live_get_data_packet_leave, ret);
+	return ret;
 }
 
 static
@@ -984,7 +1004,7 @@ void lttng_index_to_packet_index(struct lttng_viewer_index *lindex,
  * Returns 0 on success or a negative value on error.
  */
 static
-int get_next_index(struct lttng_live_ctx *ctx,
+int actual_get_next_index(struct lttng_live_ctx *ctx,
 		struct lttng_live_viewer_stream *viewer_stream,
 		struct packet_index *index, uint64_t *stream_id,
 		struct ctf_file_stream *file_stream)
@@ -1109,6 +1129,19 @@ error:
 }
 
 static
+int get_next_index(struct lttng_live_ctx *ctx,
+		struct lttng_live_viewer_stream *viewer_stream,
+		struct packet_index *index, uint64_t *stream_id,
+		struct ctf_file_stream *file_stream)
+{
+	tracepoint(babeltrace, lttng_live_get_index_enter);
+	int ret = actual_get_next_index(ctx, viewer_stream,
+		index, stream_id, file_stream);
+	tracepoint(babeltrace, lttng_live_get_index_leave, ret);
+	return ret;
+}
+
+static
 void read_packet_header(struct ctf_stream_pos *pos,
 		struct ctf_file_stream *file_stream)
 {
@@ -1187,7 +1220,7 @@ end:
 }
 
 static
-void ctf_live_packet_seek(struct bt_stream_pos *stream_pos, size_t index,
+void actual_ctf_live_packet_seek(struct bt_stream_pos *stream_pos, size_t index,
 		int whence)
 {
 	struct ctf_stream_pos *pos;
@@ -1353,6 +1386,16 @@ retry:
 end:
 	return;
 }
+
+static
+void ctf_live_packet_seek(struct bt_stream_pos *stream_pos, size_t index,
+		int whence)
+{
+	tracepoint(babeltrace, lttng_live_packet_seek_enter);
+	actual_ctf_live_packet_seek(stream_pos, index, whence);
+	tracepoint(babeltrace, lttng_live_packet_seek_leave);
+}
+
 
 int lttng_live_create_viewer_session(struct lttng_live_ctx *ctx)
 {
