@@ -1126,7 +1126,7 @@ int ctf_packet_seek(struct bt_stream_pos *stream_pos, size_t index, int whence)
 
 		if (pos->cur_index >= pos->packet_index->len) {
 			pos->offset = EOF;
-			return;
+			return 0;
 		}
 
 		packet_index = &g_array_index(pos->packet_index,
