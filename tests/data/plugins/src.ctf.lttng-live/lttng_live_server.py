@@ -20,6 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import argparse
 import collections.abc
 import logging
 import os
@@ -1356,49 +1357,52 @@ class LttngTracingSessionDescriptor:
         return self._info
 
 
-def _tracing_session_descriptors_from_args(args):
-    ts_descriptors = []
-
-    for arg in args:
-        # Format is:
-        #
-        #     NAME,ID,HOSTNAME,FREQ,CLIENTS,TRACEPATH[,TRACEPATH]...
-        parts = arg.split(',')
-        name = parts[0]
-        tracing_session_id = int(parts[1])
-        hostname = parts[2]
-        live_timer_freq = int(parts[3])
-        client_count = int(parts[4])
-        traces = [LttngTrace(path) for path in parts[5:]]
-        ts_descriptors.append(
-            LttngTracingSessionDescriptor(
-                name,
-                tracing_session_id,
-                hostname,
-                live_timer_freq,
-                client_count,
-                traces,
-            )
-        )
-
-    return ts_descriptors
+def _tracing_session_descriptors_from_arg(string):
+    # Format is:
+    #     NAME,ID,HOSTNAME,FREQ,CLIENTS,TRACEPATH[,TRACEPATH]...
+    parts = string.split(',')
+    name = parts[0]
+    tracing_session_id = int(parts[1])
+    hostname = parts[2]
+    live_timer_freq = int(parts[3])
+    client_count = int(parts[4])
+    traces = [LttngTrace(path) for path in parts[5:]]
+    return LttngTracingSessionDescriptor(
+        name, tracing_session_id, hostname, live_timer_freq, client_count, traces
+    )
 
 
 # Creates an LTTng live server with specific tracing session
 # descriptors.
-#
-# `args` is a list of tracing session descriptor strings; the format is:
-#
-#     NAME,ID,HOSTNAME,FREQ,CLIENTS,TRACEPATH[,TRACEPATH]...
-def main(tmp_port_filename, port_filename, args, log_level=logging.INFO):
-    logging.basicConfig(format='# %(asctime)-25s%(message)s', level=log_level)
-    ts_descriptors = _tracing_session_descriptors_from_args(args)
-    LttngLiveServer(tmp_port_filename, port_filename, ts_descriptors)
+def main(
+    tmp_port_filename, port_filename, sessions_descriptors, log_level=logging.INFO
+):
+    logging.getLogger().setLevel(log_level)
+    LttngLiveServer(tmp_port_filename, port_filename, sessions_descriptors)
 
 
 if __name__ == '__main__':
+    logging.basicConfig(format='# %(asctime)-25s%(message)s')
+    parser = argparse.ArgumentParser(description='LTTng-live protocol mocker')
+    parser.add_argument(
+        '--tmp-port-filename', help='The temporary port file', required=True
+    )
+    parser.add_argument(
+        '--port-filename',
+        help='The final port file. This file is present when the server is ready to receive connection.',
+        required=True,
+    )
+    parser.add_argument(
+        'sessions',
+        nargs="+",
+        metavar="SESSION",
+        type=_tracing_session_descriptors_from_arg,
+        help='A session configuration. There is no space after comma. Format is: NAME,ID,HOSTNAME,FREQ,CLIENTS,TRACEPATH[,TRACEPATH]....',
+    )
+
+    args = parser.parse_args()
     try:
-        main(sys.argv[1], sys.argv[2], sys.argv[3:])
+        main(args.tmp_port_filename, args.port_filename, args.sessions)
     except UnexpectedInput as exc:
         logging.error(str(exc))
         print(exc, file=sys.stderr)
