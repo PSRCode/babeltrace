@@ -1,2 +1,2 @@
-net://127.0.0.1:50451/host/archeepp/salut (timer = 1000000, 5 stream(s), 0 client(s) connected)
-net://127.0.0.1:50451/host/archeepp/auto-20190729-100002 (timer = 1000000, 5 stream(s), 0 client(s) connected)
+net://localhost:@PORT@/host/hostname/multi-domains (timer = 1, 10 stream(s), 0 client(s) connected)
+net://localhost:@PORT@/host/hostname/trace-with-index (timer = 1, 5 stream(s), 0 client(s) connected)

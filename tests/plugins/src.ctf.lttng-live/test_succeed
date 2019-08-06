@@ -34,8 +34,8 @@ fi
 source "$UTILSSH"
 
 this_dir_relative="plugins/src.ctf.lttng-live"
-this_dir_build="$BT_TESTS_BUILDDIR/$this_dir_relative"
 test_data_dir="$BT_TESTS_DATADIR/$this_dir_relative"
+trace_dir="$BT_CTF_TRACES_PATH/$this_dir_relative"
 
 lttng_live_server() {
 	local temp_port_file="$1"
@@ -72,7 +72,8 @@ get_cli_output_with_lttng_live_server() {
 	local cli_args_template="$1"
 	local server_args="$2"
 	local cli_stdout_file="$3"
-	local port_file="$4"
+	local cli_stderr_file="$4"
+	local port_file="$5"
 
 	local i
 	local ret
@@ -86,7 +87,7 @@ get_cli_output_with_lttng_live_server() {
 	server_pid_file="$(mktemp)"
 	server_retcode_file="$(mktemp)"
 
-	diag "Starting LTTng live server '$server_name'"
+	diag "Starting LTTng live server mockup"
 
 	# This starts the server, which eventually writes its listening
 	# port number to the `$port_file` file. The lttng_live_server()
@@ -96,6 +97,7 @@ get_cli_output_with_lttng_live_server() {
 	# `$server_retcode_file` file.
 	lttng_live_server "$temp_port_file" "$port_file" \
 		"$server_pid_file" "$server_retcode_file" "$server_args" &
+
 
 	# get port number
 	i=0
@@ -120,10 +122,10 @@ get_cli_output_with_lttng_live_server() {
 
 	diag "LTTng live port is $port"
 
-	cli_args=${$cli_args_template/@PORT@/$port}
+	cli_args=${cli_args_template//@PORT@/$port}
 
 	diag "Running CLI: 'babeltrace2 $cli_args'"
-	if echo "$cli_args" | xargs "$BT_TESTS_BT2_BIN" 1>"$cli_stdout_file" 2>/dev/null; then
+	if echo "$cli_args" | xargs "$BT_TESTS_BT2_BIN" 1>"$cli_stdout_file" 2>"$cli_stderr_file"; then
 		# CLI failed: cancel everything else
 		kill_lttng_live_server "$server_pid_file"
 		wait
@@ -163,42 +165,76 @@ get_cli_output_with_lttng_live_server() {
 }
 
 test_list_sessions() {
-	local server_name='lttng_live_list_sessions_faux_server'
-	local server_script="$test_data_dir/$server_name.py"
-	local test_text="CLI prints the expected session list"
+	# Test the basic listing of sessions.
+	# Ensure that a multi-domain trace is seen as a single session.
 
 	local port
 	local temp_port_file
 	local port_file
 	local tmp_stdout_expected
 
-	temp_port_file="$(mktemp)"
+	local test_text="CLI prints the expected session list"
+	local template_expected=$(<"$test_data_dir/cli-list-sessions.expect")
+	local cli_args_template="-i lttng-live net://localhost:@PORT@"
+	local server_args="'multi-domains,0,hostname,1,0,${trace_dir}/multi-domains/kernel/,${trace_dir}/multi-domains/ust/' 'trace-with-index,1,hostname,1,0,${trace_dir}/trace-with-index/'"
+
+	cli_stderr="$(mktemp)"
+	cli_stdout="$(mktemp)"
+	empty_file="$(mktemp)"
 	port_file="$(mktemp)"
 	tmp_stdout_expected="$(mktemp)"
 
-	diag "Starting server '$server_name'"
-	"$BT_TESTS_PYTHON_BIN" "$server_script" "$temp_port_file" "$port_file" &
+	get_cli_output_with_lttng_live_server "$cli_args_template" "$server_args" "$cli_stdout" "$cli_stderr" "$port_file"
+	port=$(<"$port_file")
 
-	# Get port number
-	while [ ! -s "$port_file" ]; do
-		sleep .1
-	done
+	# Craft the expected output. This is necessary since the port number
+	# (random) of a "relayd" is present in the output.
+	template_expected=${template_expected//@PORT@/$port}
 
-	port="$(<"$port_file")"
+	echo "$template_expected" > "$tmp_stdout_expected"
 
-	# in the CLI output, the printed port depends on this test's port
-	echo "net://localhost:$port/host/archeepp/salut (timer = 1000000, 5 stream(s), 0 client(s) connected)" >> "$tmp_stdout_expected"
-	echo "net://localhost:$port/host/archeepp/auto-20190729-100002 (timer = 1000000, 5 stream(s), 0 client(s) connected)" >> "$tmp_stdout_expected"
-
-	diag "Listing available LTTng live sessions with CLI (port $port)"
-	bt_diff_cli "$tmp_stdout_expected" /dev/null \
-		-i lttng-live "net://localhost:$port"
+	bt_diff "$tmp_stdout_expected" "$cli_stdout" "$empty_file" "$cli_stderr" "$cli_args_template"
 	ok $? "$test_text"
-	rm -f "$temp_port_file"
-	rm -f "$port_file"
-	rm -f "$tmp_stdout_expected"
+	rm -rf "$cli_stderr"
+	rm -rf "$cli_stdout"
+	rm -rf "$empty_file"
+	rm -rf "$port_file"
+	rm -rf "$tmp_stdout_expected"
 }
 
-plan_tests 1
+test_multi_domains() {
+	# Attach and consume data from a multi-domains session with discarded
+	# events.
+
+	local port
+	local temp_port_file
+	local port_file
+	local tmp_stdout_expected
+	local server_args
+
+	local test_text="CLI attach and fetch from multi-domains session"
+	local cli_args_template="-i lttng-live net://localhost:@PORT@/host/hostname/multi-domains -c sink.text.details"
+	local server_args="'multi-domains,0,hostname,1,0,${trace_dir}/multi-domains/kernel/,${trace_dir}/multi-domains/ust/'"
+
+	cli_stderr="$(mktemp)"
+	cli_stdout="$(mktemp)"
+	empty_file="$(mktemp)"
+	port_file="$(mktemp)"
+	tmp_stdout_expected="$(mktemp)"
+
+	get_cli_output_with_lttng_live_server "$cli_args_template" "$server_args" "$cli_stdout" "$cli_stderr" "$port_file"
+	port=$(<"$port_file")
+
+	bt_diff "${test_data_dir}/cli-multi-domains.expect" "$cli_stdout" "$empty_file" "$cli_stderr" "$cli_args_template"
+	ok $? "$test_text"
+
+	echo rm -rf "$cli_stderr"
+	echo rm -rf "$cli_stdout"
+	rm -rf "$port_file"
+	rm -rf "$tmp_stdout_expected"
+}
+
+plan_tests 2
 
 test_list_sessions
+test_multi_domains
