@@ -202,6 +202,38 @@ test_list_sessions() {
 	rm -rf "$tmp_stdout_expected"
 }
 
+test_base() {
+	# Attach and consume data from a multi packets ust session with no
+	# discarded events.
+
+	local port
+	local temp_port_file
+	local port_file
+	local tmp_stdout_expected
+	local server_args
+
+	local test_text="CLI attach and fetch from single-domains session - no discarded events"
+	local cli_args_template="-i lttng-live net://localhost:@PORT@/host/hostname/trace-with-index -c sink.text.details"
+	local server_args="'trace-with-index,0,hostname,1,0,${trace_dir}/trace-with-index/'"
+
+	cli_stderr="$(mktemp)"
+	cli_stdout="$(mktemp)"
+	empty_file="$(mktemp)"
+	port_file="$(mktemp)"
+	tmp_stdout_expected="$(mktemp)"
+
+	get_cli_output_with_lttng_live_server "$cli_args_template" "$server_args" "$cli_stdout" "$cli_stderr" "$port_file"
+	port=$(<"$port_file")
+
+	bt_diff "${test_data_dir}/cli-base.expect" "$cli_stdout" "$empty_file" "$cli_stderr" "$cli_args_template"
+	ok $? "$test_text"
+
+	rm -rf "$cli_stderr"
+	rm -rf "$cli_stdout"
+	rm -rf "$port_file"
+	rm -rf "$tmp_stdout_expected"
+}
+
 test_multi_domains() {
 	# Attach and consume data from a multi-domains session with discarded
 	# events.
@@ -212,7 +244,7 @@ test_multi_domains() {
 	local tmp_stdout_expected
 	local server_args
 
-	local test_text="CLI attach and fetch from multi-domains session"
+	local test_text="CLI attach and fetch from multi-domains session - discarded events"
 	local cli_args_template="-i lttng-live net://localhost:@PORT@/host/hostname/multi-domains -c sink.text.details"
 	local server_args="'multi-domains,0,hostname,1,0,${trace_dir}/multi-domains/kernel/,${trace_dir}/multi-domains/ust/'"
 
@@ -228,13 +260,14 @@ test_multi_domains() {
 	bt_diff "${test_data_dir}/cli-multi-domains.expect" "$cli_stdout" "$empty_file" "$cli_stderr" "$cli_args_template"
 	ok $? "$test_text"
 
-	echo rm -rf "$cli_stderr"
-	echo rm -rf "$cli_stdout"
+	rm -rf "$cli_stderr"
+	rm -rf "$cli_stdout"
 	rm -rf "$port_file"
 	rm -rf "$tmp_stdout_expected"
 }
 
-plan_tests 2
+plan_tests 3
 
 test_list_sessions
+test_base
 test_multi_domains

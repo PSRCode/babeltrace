@@ -111161,7 +111161,7 @@ Packet end
 [953,355,868,518,968 cycles, 1,565,032,562,352,676,346 ns from origin]
 [953,386,942,506,603 cycles, 1,565,032,593,426,663,981 ns from origin]
 {Trace 1, Stream class ID 0, Stream ID 0}
-Discarded events
+Discarded events (728 events)
 
 [953,355,868,518,968 cycles, 1,565,032,562,352,676,346 ns from origin]
 {Trace 1, Stream class ID 0, Stream ID 0}
@@ -142770,11 +142770,6 @@ Event `sample_component:message` (Class ID 0):
 Event `sample_component:message` (Class ID 0):
   Payload:
     message: Hello World
-
-[953,605,633,513,007 cycles, 1,565,032,812,117,670,385 ns from origin]
-[953,605,633,513,007 cycles, 1,565,032,812,117,670,385 ns from origin]
-{Trace 1, Stream class ID 0, Stream ID 0}
-Discarded events
 
 [953,605,633,513,007 cycles, 1,565,032,812,117,670,385 ns from origin]
 {Trace 1, Stream class ID 0, Stream ID 0}
