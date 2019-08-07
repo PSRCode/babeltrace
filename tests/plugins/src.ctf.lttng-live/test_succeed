@@ -198,8 +198,8 @@ run_test() {
 	bt_diff "$expected_stdout" "$cli_stdout" "$expected_stderr" "$cli_stderr" "$cli_args_template"
 	ok $? "$test_text"
 
-	echo "stderr" rm -f "$cli_stderr"
-	echo stdout rm -f "$cli_stdout"
+	rm -f "$cli_stderr"
+	rm -f "$cli_stdout"
 	rm -f "$port_file"
 }
 
