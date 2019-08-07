@@ -277,8 +277,28 @@ test_multi_domains() {
 	rm -rf "$expected_stderr"
 }
 
-plan_tests 3
+test_rate_limited() {
+	# Attach and consume data from a multi packets ust session with no
+	# discarded events. Enforce a server side limit on the stream data
+	# requests. Ensure that babeltrace respect the returned sized and that
+	# many requests per packet works as expected.
+	# The packet size of the test trace is 4k. Limit requests to 1k.
+	local test_text="CLI many requests per packet"
+	local cli_args_template="-i lttng-live net://localhost:@PORT@/host/hostname/trace-with-index -c sink.text.details"
+	local server_args="--max-query-data-response-size 1024 'trace-with-index,0,hostname,1,0,${trace_dir}/trace-with-index/'"
+	local expected_stdout="${test_data_dir}/cli-base.expect"
+	local expected_stderr
 
+	# Empty file for stderr expected
+	expected_stderr="$(mktemp)"
+
+	run_test "$test_text" "$cli_args_template" "$server_args" "$expected_stdout" "$expected_stderr"
+
+	rm -rf "$expected_stderr"
+}
+
+plan_tests 4
 test_list_sessions
 test_base
 test_multi_domains
+test_rate_limited
