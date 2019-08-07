@@ -957,10 +957,11 @@ class _LttngLiveViewerSessionTracingSessionState:
 # An LTTng live viewer session manages a view on tracing sessions
 # and replies to commands accordingly.
 class _LttngLiveViewerSession:
-    def __init__(self, viewer_session_id, tracing_session_descriptors):
+    def __init__(self, viewer_session_id, tracing_session_descriptors, max_query_data_response_size):
         self._viewer_session_id = viewer_session_id
         self._ts_states = {}
         self._stream_states = {}
+        self._max_query_data_response_size = max_query_data_response_size
         total_stream_infos = 0
 
         for ts_descr in tracing_session_descriptors:
@@ -1091,6 +1092,7 @@ class _LttngLiveViewerSession:
         fmt = 'Handling "get data stream packet data" command: stream-id={}, offset={}, req-length={}'
         logging.info(fmt.format(cmd.stream_id, cmd.offset, cmd.req_length))
         stream_state = self._get_stream_state(cmd.stream_id)
+        data_response_length = cmd.req_length
 
         if type(stream_state) is not _LttngLiveViewerSessionDataStreamState:
             raise UnexpectedInput(
@@ -1103,7 +1105,15 @@ class _LttngLiveViewerSession:
                 status, bytes(), True, False
             )
 
-        data = stream_state.data_stream.get_data(cmd.offset, cmd.req_length)
+        if self._max_query_data_response_size:
+            # Enforce a server side limit on the query requested length.
+            # To ensure that the transaction terminate take the minimum of both
+            # value.
+            data_response_length = min(cmd.req_length, self._max_query_data_response_size)
+            fmt = 'Limiting "get data stream packet data" command: req-length={} actual response size={}'
+            logging.info(fmt.format(cmd.req_length, data_response_length))
+
+        data = stream_state.data_stream.get_data(cmd.offset, data_response_length)
         status = _LttngLiveViewerGetDataStreamPacketDataReply.Status.OK
         return _LttngLiveViewerGetDataStreamPacketDataReply(status, data, False, False)
 
@@ -1171,7 +1181,8 @@ class _LttngLiveViewerSession:
 # When the viewer closes the connection, the server's constructor
 # returns.
 class LttngLiveServer:
-    def __init__(self, tmp_port_filename, port_filename, tracing_session_descriptors):
+    def __init__(self, tmp_port_filename, port_filename,
+            tracing_session_descriptors, max_query_data_response_size):
         logging.info('Server configuration:')
 
         if tmp_port_filename is not None:
@@ -1179,6 +1190,9 @@ class LttngLiveServer:
 
         if port_filename is not None:
             logging.info('  Port file name: `{}`'.format(port_filename))
+        if max_query_data_response_size is not None:
+            logging.info('  Maximum response data query size: `{}`'.format(max_query_data_response_size))
+
 
         for ts_descr in tracing_session_descriptors:
             info = ts_descr.info
@@ -1198,6 +1212,7 @@ class LttngLiveServer:
                 logging.info('    Trace: path="{}"'.format(trace.path))
 
         self._ts_descriptors = tracing_session_descriptors
+        self._max_query_data_response_size = max_query_data_response_size
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._codec = _LttngLiveViewerProtocolCodec()
 
@@ -1276,7 +1291,8 @@ class LttngLiveServer:
         logging.info(
             'LTTng live viewer connected: version={}.{}'.format(cmd.major, cmd.minor)
         )
-        viewer_session = _LttngLiveViewerSession(23, self._ts_descriptors)
+        viewer_session = _LttngLiveViewerSession(23, self._ts_descriptors,
+                self._max_query_data_response_size)
 
         # Send "connect" reply
         self._send_reply(
@@ -1371,16 +1387,6 @@ def _tracing_session_descriptors_from_arg(string):
         name, tracing_session_id, hostname, live_timer_freq, client_count, traces
     )
 
-
-# Creates an LTTng live server with specific tracing session
-# descriptors.
-def main(
-    tmp_port_filename, port_filename, sessions_descriptors, log_level=logging.INFO
-):
-    logging.getLogger().setLevel(log_level)
-    LttngLiveServer(tmp_port_filename, port_filename, sessions_descriptors)
-
-
 if __name__ == '__main__':
     logging.basicConfig(format='# %(asctime)-25s%(message)s')
     parser = argparse.ArgumentParser(description='LTTng-live protocol mocker')
@@ -1393,6 +1399,11 @@ if __name__ == '__main__':
         required=True,
     )
     parser.add_argument(
+        '--max-query-data-response-size',
+        type=int,
+        help='The maximum size of control data response in bytes',
+    )
+    parser.add_argument(
         'sessions',
         nargs="+",
         metavar="SESSION",
@@ -1402,7 +1413,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     try:
-        main(args.tmp_port_filename, args.port_filename, args.sessions)
+        logging.getLogger().setLevel(logging.INFO)
+        LttngLiveServer(args.tmp_port_filename, args.port_filename,
+                args.sessions, args.max_query_data_response_size)
     except UnexpectedInput as exc:
         logging.error(str(exc))
         print(exc, file=sys.stderr)
