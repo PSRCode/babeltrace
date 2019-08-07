@@ -33,6 +33,18 @@ fi
 # shellcheck source=../../utils/utils.sh
 source "$UTILSSH"
 
+function cleanup ()
+{
+	# Disable trap for SIGTERM since the following kill to the
+	# pidgroup will be SIGTERM. Otherwise it loops.
+	# The '-' before the pid number ($$) indicates 'kill' to signal the
+	# whole process group.
+	trap - SIGTERM && kill -- -$$
+}
+
+# Ensure that background child jobs are killed on SIGINT/SIGTERM
+trap cleanup SIGINT SIGTERM
+
 this_dir_relative="plugins/src.ctf.lttng-live"
 test_data_dir="$BT_TESTS_DATADIR/$this_dir_relative"
 trace_dir="$BT_CTF_TRACES_PATH/$this_dir_relative"
