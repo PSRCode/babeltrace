@@ -195,8 +195,10 @@ run_test() {
 	get_cli_output_with_lttng_live_server "$cli_args_template" "$server_args" "$cli_stdout" "$cli_stderr" "$port_file"
 	port=$(<"$port_file")
 
-	bt_diff "$expected_stdout" "$cli_stdout" "$expected_stderr" "$cli_stderr" "$cli_args_template"
-	ok $? "$test_text"
+	bt_diff "$expected_stdout" "$cli_stdout"
+	ok $? "$test_text - stdout"
+	bt_diff "$expected_stderr" "$cli_stderr"
+	ok $? "$test_text - stderr"
 
 	rm -f "$cli_stderr"
 	rm -f "$cli_stdout"
@@ -233,8 +235,10 @@ test_list_sessions() {
 
 	echo "$template_expected" > "$tmp_stdout_expected"
 
-	bt_diff "$tmp_stdout_expected" "$cli_stdout" "$empty_file" "$cli_stderr" "$cli_args_template"
-	ok $? "$test_text"
+	bt_diff "$tmp_stdout_expected" "$cli_stdout"
+	ok $? "$test_text - stdout"
+	bt_diff "$empty_file" "$cli_stderr"
+	ok $? "$test_text - stderr"
 
 	rm -rf "$cli_stderr"
 	rm -rf "$cli_stdout"
