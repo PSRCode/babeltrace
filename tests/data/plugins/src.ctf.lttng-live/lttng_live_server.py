@@ -1387,6 +1387,16 @@ def _tracing_session_descriptors_from_arg(string):
         name, tracing_session_id, hostname, live_timer_freq, client_count, traces
     )
 
+
+def _loglevel_parser(string):
+    loglevels = { 'info' : logging.INFO,
+            'warning' : logging.WARNING,
+            }
+    if string not in loglevels:
+        msg = "{} is not a valid loglevel".format(string)
+        raise argparse.ArgumentTypeError(msg)
+    return loglevels[string]
+
 if __name__ == '__main__':
     logging.basicConfig(format='# %(asctime)-25s%(message)s')
     parser = argparse.ArgumentParser(description='LTTng-live protocol mocker')
@@ -1404,6 +1414,12 @@ if __name__ == '__main__':
         help='The maximum size of control data response in bytes',
     )
     parser.add_argument(
+            '--log-level',
+            default='warning',
+            choices=['info','warning'],
+            help='The loglevel to be used.'
+    )
+    parser.add_argument(
         'sessions',
         nargs="+",
         metavar="SESSION",
@@ -1413,7 +1429,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     try:
-        logging.getLogger().setLevel(logging.INFO)
+        logging.getLogger().setLevel(_loglevel_parser(args.log_level))
         LttngLiveServer(args.tmp_port_filename, args.port_filename,
                 args.sessions, args.max_query_data_response_size)
     except UnexpectedInput as exc:
