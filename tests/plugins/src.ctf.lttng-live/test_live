@@ -49,12 +49,21 @@ this_dir_relative="plugins/src.ctf.lttng-live"
 test_data_dir="$BT_TESTS_DATADIR/$this_dir_relative"
 trace_dir="$BT_CTF_TRACES_PATH/succeed"
 
+if [ "$BT_OS_TYPE" = "mingw" ]; then
+	test_data_dir=$(cygpath -w "$test_data_dir")
+	trace_dir=$(cygpath -w "$trace_dir")
+        dir_sep="\\"
+else
+	dir_sep="/"
+fi
+
+
 lttng_live_server() {
 	local port_file="$1"
 	local pid_file="$2"
 	local retcode_file="$3"
 	local server_args="$4"
-	local server_script="$test_data_dir/lttng_live_server.py"
+	local server_script="${test_data_dir}${dir_sep}lttng_live_server.py"
 
 	# start server
 	echo "$server_args" | xargs "$BT_TESTS_PYTHON_BIN" "$server_script" --port-file "$port_file" &
@@ -210,9 +219,12 @@ test_list_sessions() {
 
 	local test_text="CLI prints the expected session list"
 	local cli_args_template="-i lttng-live net://localhost:@PORT@"
-	local server_args="'multi-domains,0,hostname,1,0,${trace_dir}/multi-domains/ust/' 'multi-domains,1,hostname,1,0,${trace_dir}/multi-domains/kernel/' 'trace-with-index,2,hostname,1,0,${trace_dir}/trace-with-index/' "
+	local ust_trace_path="${trace_dir}${dir_sep}multi-domains${dir_sep}ust"
+	local kernel_trace_path="${trace_dir}${dir_sep}multi-domains${dir_sep}kernel"
+	local index_trace_path="${trace_dir}${dir_sep}trace-with-index"
+	local server_args="'multi-domains,0,hostname,1,0,$ust_trace_path' 'multi-domains,1,hostname,1,0,$kernel_trace_path' 'trace-with-index,2,hostname,1,0,$index_trace_path'"
 
-	template_expected=$(<"$test_data_dir/cli-list-sessions.expect")
+	template_expected=$(<"${test_data_dir}${dir_sep}cli-list-sessions.expect")
 	cli_stderr="$(mktemp)"
 	cli_stdout="$(mktemp)"
 	empty_file="$(mktemp)"
@@ -245,8 +257,8 @@ test_base() {
 	# discarded events.
 	local test_text="CLI attach and fetch from single-domains session - no discarded events"
 	local cli_args_template="-i lttng-live net://localhost:@PORT@/host/hostname/trace-with-index -c sink.text.details"
-	local server_args="'trace-with-index,0,hostname,1,0,${trace_dir}/trace-with-index/'"
-	local expected_stdout="${test_data_dir}/cli-base.expect"
+	local server_args="'trace-with-index,0,hostname,1,0,${trace_dir}${dir_sep}trace-with-index/'"
+	local expected_stdout="${test_data_dir}${dir_sep}cli-base.expect"
 	local expected_stderr
 
 	# Empty file for stderr expected
@@ -262,8 +274,8 @@ test_multi_domains() {
 	# events.
 	local test_text="CLI attach and fetch from multi-domains session - discarded events"
 	local cli_args_template="-i lttng-live net://localhost:@PORT@/host/hostname/multi-domains -c sink.text.details"
-	local server_args="'multi-domains,0,hostname,1,0,${trace_dir}/multi-domains/kernel/,${trace_dir}/multi-domains/ust/'"
-	local expected_stdout="${test_data_dir}/cli-multi-domains.expect"
+	local server_args="'multi-domains,0,hostname,1,0,${trace_dir}${dir_sep}multi-domains${dir_sep}kernel,${trace_dir}${dir_sep}multi-domains${dir_sep}ust'"
+	local expected_stdout="${test_data_dir}${dir_sep}cli-multi-domains.expect"
 	local expected_stderr
 
 	# Empty file for stderr expected
@@ -282,8 +294,8 @@ test_rate_limited() {
 	# The packet size of the test trace is 4k. Limit requests to 1k.
 	local test_text="CLI many requests per packet"
 	local cli_args_template="-i lttng-live net://localhost:@PORT@/host/hostname/trace-with-index -c sink.text.details"
-	local server_args="--max-query-data-response-size 1024 'trace-with-index,0,hostname,1,0,${trace_dir}/trace-with-index/'"
-	local expected_stdout="${test_data_dir}/cli-base.expect"
+	local server_args="--max-query-data-response-size 1024 'trace-with-index,0,hostname,1,0,${trace_dir}{$dir_sep}trace-with-index'"
+	local expected_stdout="${test_data_dir}${dir_sep}cli-base.expect"
 	local expected_stderr
 
 	# Empty file for stderr expected
@@ -301,15 +313,15 @@ test_compare_to_ctf_fs() {
 	# that ordering is consistent between live and ctf fs.
 	local test_text="CLI src.ctf.fs vs src.ctf.lttng-live"
 	local cli_args_template="-i lttng-live net://localhost:@PORT@/host/hostname/multi-domains -c sink.text.details --params with-trace-name=false,with-stream-name=false"
-	local server_args="'multi-domains,0,hostname,1,0,${trace_dir}/multi-domains/kernel/' 'multi-domains,1,hostname,1,0,${trace_dir}/multi-domains/ust/'"
-	local server_args_inverse="'multi-domains,0,hostname,1,0,${trace_dir}/multi-domains/ust/' 'multi-domains,1,hostname,1,0,${trace_dir}/multi-domains/kernel/'"
+	local server_args="'multi-domains,0,hostname,1,0,${trace_dir}${dir_sep}multi-domains${dir_sep}kernel' 'multi-domains,1,hostname,1,0,${trace_dir}${dir_sep}multi-domains${dir_sep}ust'"
+	local server_args_inverse="'multi-domains,0,hostname,1,0,${trace_dir}${dir_sep}multi-domains${dir_sep}ust' 'multi-domains,1,hostname,1,0,${trace_dir}${dir_sep}multi-domains${dir_sep}kernel${dir_sep}'"
 	local expected_stdout
 	local expected_stderr
 
 	expected_stdout=$(mktemp)
 	expected_stderr=$(mktemp)
 
-	bt_cli "$expected_stdout" "$expected_stderr" "${trace_dir}/multi-domains" -c sink.text.details --params "with-trace-name=false,with-stream-name=false"
+	bt_cli "$expected_stdout" "$expected_stderr" "${trace_dir}${dir_sep}multi-domains" -c sink.text.details --params "with-trace-name=false,with-stream-name=false"
 	run_test "$test_text" "$cli_args_template" "$server_args" "$expected_stdout" "$expected_stderr"
 	diag "Inverse session order from lttng-relayd"
 	run_test "$test_text" "$cli_args_template" "$server_args_inverse" "$expected_stdout" "$expected_stderr"
